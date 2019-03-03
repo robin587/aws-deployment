@@ -1,0 +1,61 @@
+Step 1: Configuration
+	For the Multicast the following number of EC2 instances should be available:
+•	Super Node –	An EC2 instance which will act as the Relay Agent. This can be any EC2 instance without the Tango Accelerator
+•	Node 1        –	Accelerator Server 1
+•	Node 2        –	Accelerator Server 2
+
+	Login to the Super Node command prompt
+
+	Install the compile tools required
+yum -y install svn make gcc
+
+	Download the code
+svn co https://svn.ntop.org/svn/ntop/trunk/n2n
+
+	Disable encryption and compression before compiling the binaries to improve performance
+cd n2n/n2n_v2
+sed -i "s/#N2N_OPTION_AES=no/N2N_OPTION_AES=no/g" Makefile
+sed -i "s/#define N2N_COMPRESSION_ENABLED 1/#define N2N_COMPRESSION_ENABLED 0/g" n2n.h
+
+	Prepare the binary files
+make
+	The above command should result into two binaries:
+•	Supernode –	to be run on the Super Node, used for connection setup and VPN tunnel registration
+•	edge        –	To be run on all the Accelerator nodes
+
+	Install the supernode binary on this host (Super Node)
+cp ./supernode /usr/bin/
+
+	On the Accelerator Node servers, install the edge binary
+copy the edge binary to /usr/bin in the Accelerator Nodes
+chmod +x /usr/bin/edge
+
+	Starting the binaries
+•	On the Super Node:
+supernode -l 1200
+•	On the Accelerator Node 1:
+edge -l <private IP of Super Node>:1200 -c Intershop -a 192.168.1.1 –E
+route add -net 224.0.0.0 netmask 240.0.0.0 dev edge0
+•	On the Accelerator Node 2:
+edge -l <private IP of Super Node>:1200 -c Intershop -a 192.168.1.2 –E
+route add -net 224.0.0.0 netmask 240.0.0.0 dev edge0
+
+
+Note: 
+•	To add the process in start up use the following commands in the respective nodes 
+	echo "supernode -l 1200" &gt;&gt; /etc/rc.local
+
+echo "edge -l <private IP of Super Node>:1200 -c Intershop -a 192.168.1.1" &gt;&gt; /etc/rc.local
+echo "sleep 10" &gt;&gt; /etc/rc.local
+echo "route add -net 224.0.0.0 netmask 240.0.0.0 dev edge0" &gt;&gt; /etc/rc.local
+
+
+echo "edge -l <private IP of Super Node>:1200 -c Intershop -a 192.168.1.2" &gt;&gt; /etc/rc.local 
+echo "sleep 10" &gt;&gt; /etc/rc.local
+echo "route add -net 224.0.0.0 netmask 240.0.0.0 dev edge0" &gt;&gt; /etc/rc.local
+
+•	The Communication is on UDP port 1200, so the AWS security group of all the three instances should allow that.
+Step 2: Verifying Multicast on EC2
+	In order to verify the configuration, log in to the Accelerator Nodes command prompt
+ifconfig edge0
+	An edge0 interfaces with the IP given during configuration should be available.
